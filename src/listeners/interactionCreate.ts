@@ -44,6 +44,12 @@ export function createInteractionCreateListener(ctx: BotContext) {
     } catch (err) {
       console.error("[interaction]", err);
       try {
+        if (interaction.isAutocomplete()) {
+          if (!interaction.responded) {
+            await interaction.respond([]);
+          }
+          return;
+        }
         if (!interaction.isRepliable()) return;
         const payload = {
           embeds: [

@@ -2,6 +2,15 @@
  * Ponto de entrada: cliente Discord, migrações, registro de listeners.
  */
 import { Client, GatewayIntentBits, Partials } from "discord.js";
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[unhandledRejection]", reason, promise);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+  process.exit(1);
+});
 import { env } from "./config/env.js";
 import { pool } from "./database/pool.js";
 import { runMigrations } from "./database/migrate.js";
@@ -38,10 +47,21 @@ async function bootstrap(): Promise<void> {
     throw e;
   }
 
+  let shuttingDown = false;
   const shutdown = async (): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log("[shutdown] Encerrando…");
-    client.destroy();
-    await pool.end();
+    try {
+      client.destroy();
+    } catch (e) {
+      console.error("[shutdown] client.destroy:", e);
+    }
+    try {
+      await pool.end();
+    } catch (e) {
+      console.error("[shutdown] pool.end:", e);
+    }
     process.exit(0);
   };
   process.on("SIGINT", () => void shutdown());

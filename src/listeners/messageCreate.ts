@@ -8,18 +8,22 @@ import { refreshEventAnnouncementEmbed } from "../utils/eventAnnouncementRefresh
  */
 export function createMessageCreateListener(ctx: BotContext) {
   return async (message: Message): Promise<void> => {
-    if (!message.guild || message.author.bot) return;
-    if (message.channel.isDMBased()) return;
+    try {
+      if (!message.guild || message.author.bot) return;
+      if (message.channel.isDMBased()) return;
 
-    const result = await ctx.eventService.recordChannelMessage(
-      message.channel.id,
-      message.guild.id,
-      message.author.id,
-    );
-    if (!result.recorded || !result.eventId) return;
+      const result = await ctx.eventService.recordChannelMessage(
+        message.channel.id,
+        message.guild.id,
+        message.author.id,
+      );
+      if (!result.recorded || !result.eventId) return;
 
-    if (result.wasNewParticipant) {
-      await refreshEventAnnouncementEmbed(ctx, message.guild.id, result.eventId);
+      if (result.wasNewParticipant) {
+        await refreshEventAnnouncementEmbed(ctx, message.guild.id, result.eventId);
+      }
+    } catch (e) {
+      console.error("[messageCreate]", e);
     }
   };
 }
