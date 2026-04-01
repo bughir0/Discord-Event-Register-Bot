@@ -44,17 +44,21 @@ export function createInteractionCreateListener(ctx: BotContext) {
     } catch (err) {
       console.error("[interaction]", err);
       try {
-        if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-          await interaction.reply({
-            embeds: [
-              embedResponse(
-                "Erro",
-                "Ocorreu um erro ao processar esta interação. Tente novamente.",
-                EMBED.error,
-              ),
-            ],
-            ephemeral: true,
-          });
+        if (!interaction.isRepliable()) return;
+        const payload = {
+          embeds: [
+            embedResponse(
+              "Erro",
+              "Ocorreu um erro ao processar esta interação. Tente novamente.",
+              EMBED.error,
+            ),
+          ],
+          ephemeral: true as const,
+        };
+        if (interaction.deferred) {
+          await interaction.editReply({ embeds: payload.embeds });
+        } else if (!interaction.replied) {
+          await interaction.reply(payload);
         }
       } catch {
         // ignorar falha secundária

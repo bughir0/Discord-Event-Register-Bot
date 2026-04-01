@@ -3,6 +3,24 @@ import { PermissionFlagsBits } from "discord.js";
 import { env } from "../config/env.js";
 import { EMBED, embedResponse } from "./embedResponse.js";
 
+/**
+ * Resposta ephemeral que funciona antes ou depois de `deferReply`
+ * (evita "The application did not respond" e erros duplicados).
+ */
+export async function replyEphemeralCommand(
+  interaction: ChatInputCommandInteraction,
+  title: string,
+  description: string,
+  color: number = EMBED.error,
+): Promise<void> {
+  const embeds = [embedResponse(title, description, color)];
+  if (interaction.deferred) {
+    await interaction.editReply({ embeds });
+  } else {
+    await interaction.reply({ embeds, ephemeral: true });
+  }
+}
+
 function memberHasAnyRole(member: GuildMember, roleIds: string[]): boolean {
   if (roleIds.length === 0) return false;
   return roleIds.some((id) => member.roles.cache.has(id));
@@ -28,29 +46,21 @@ export async function requireStaff(
 ): Promise<boolean> {
   const m = interaction.member;
   if (!m || typeof m === "string" || !("roles" in m)) {
-    await interaction.reply({
-      embeds: [
-        embedResponse(
-          "Servidor necessário",
-          "Este comando só pode ser usado em um **servidor**.",
-          EMBED.error,
-        ),
-      ],
-      ephemeral: true,
-    });
+    await replyEphemeralCommand(
+      interaction,
+      "Servidor necessário",
+      "Este comando só pode ser usado em um **servidor**.",
+      EMBED.error,
+    );
     return false;
   }
   if (!isStaff(m as GuildMember)) {
-    await interaction.reply({
-      embeds: [
-        embedResponse(
-          "Sem permissão",
-          "É necessário cargo de **staff** (configurado no bot) ou a permissão **Gerenciar servidor**.",
-          EMBED.error,
-        ),
-      ],
-      ephemeral: true,
-    });
+    await replyEphemeralCommand(
+      interaction,
+      "Sem permissão",
+      "É necessário cargo de **staff** (configurado no bot) ou a permissão **Gerenciar servidor**.",
+      EMBED.error,
+    );
     return false;
   }
   return true;
@@ -61,29 +71,21 @@ export async function requireAdmin(
 ): Promise<boolean> {
   const m = interaction.member;
   if (!m || typeof m === "string" || !("roles" in m)) {
-    await interaction.reply({
-      embeds: [
-        embedResponse(
-          "Servidor necessário",
-          "Este comando só pode ser usado em um **servidor**.",
-          EMBED.error,
-        ),
-      ],
-      ephemeral: true,
-    });
+    await replyEphemeralCommand(
+      interaction,
+      "Servidor necessário",
+      "Este comando só pode ser usado em um **servidor**.",
+      EMBED.error,
+    );
     return false;
   }
   if (!isAdmin(m as GuildMember)) {
-    await interaction.reply({
-      embeds: [
-        embedResponse(
-          "Sem permissão",
-          "Apenas **administradores** (cargo configurado ou **Gerenciar servidor**) podem usar esta ação.",
-          EMBED.error,
-        ),
-      ],
-      ephemeral: true,
-    });
+    await replyEphemeralCommand(
+      interaction,
+      "Sem permissão",
+      "Apenas **administradores** (cargo configurado ou **Gerenciar servidor**) podem usar esta ação.",
+      EMBED.error,
+    );
     return false;
   }
   return true;

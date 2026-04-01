@@ -6,7 +6,7 @@ import {
   type GuildTextBasedChannel,
 } from "discord.js";
 import type { BotContext } from "../context.js";
-import { requireAdmin, requireStaff } from "../utils/permissions.js";
+import { replyEphemeralCommand, requireAdmin, requireStaff } from "../utils/permissions.js";
 import { EMBED, embedResponse } from "../utils/embedResponse.js";
 import {
   buildPurgeConfirmationEmbed,
@@ -177,12 +177,14 @@ async function handleFinalizar(
     return;
   }
 
+  await interaction.deferReply({ ephemeral: false });
+
   const rawId = interaction.options.getString("evento_id");
   let eventId = parseEventId(rawId);
   if (!eventId) {
     const active = await ctx.eventService.getActiveEventForChannel(interaction.channel.id);
     if (!active) {
-      await interaction.reply({
+      await interaction.editReply({
         embeds: [
           embedResponse(
             "Nenhum evento ativo",
@@ -190,14 +192,11 @@ async function handleFinalizar(
             EMBED.warn,
           ),
         ],
-        ephemeral: true,
       });
       return;
     }
     eventId = active.id;
   }
-
-  await interaction.deferReply({ ephemeral: false });
 
   const before = await ctx.eventService.getEvent(interaction.guild.id, eventId);
   if (!before || before.status !== "active") {
@@ -253,14 +252,21 @@ async function handleListar(
   interaction: ChatInputCommandInteraction,
   ctx: BotContext,
 ): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
   if (!(await requireStaff(interaction))) return;
-  if (!interaction.guild) return;
+  if (!interaction.guild) {
+    await replyEphemeralCommand(
+      interaction,
+      "Servidor necessário",
+      "Use este comando em um **servidor**.",
+      EMBED.error,
+    );
+    return;
+  }
 
   const { year: cy, month: cm } = utcNowParts();
   const mes = interaction.options.getInteger("mes") ?? cm;
   const ano = interaction.options.getInteger("ano") ?? cy;
-
-  await interaction.deferReply({ ephemeral: true });
 
   const list = await ctx.eventService.listEventsForMonth(interaction.guild.id, ano, mes);
   if (list.length === 0) {
@@ -292,19 +298,28 @@ async function handleDetalhes(
   interaction: ChatInputCommandInteraction,
   ctx: BotContext,
 ): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
   if (!(await requireStaff(interaction))) return;
-  if (!interaction.guild) return;
-
-  const eventId = parseEventId(interaction.options.getString("evento_id", true));
-  if (!eventId) {
-    await interaction.reply({
-      embeds: [embedResponse("ID inválido", "Informe um ID numérico de evento.", EMBED.error)],
-      ephemeral: true,
-    });
+  if (!interaction.guild) {
+    await replyEphemeralCommand(
+      interaction,
+      "Servidor necessário",
+      "Use este comando em um **servidor**.",
+      EMBED.error,
+    );
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  const eventId = parseEventId(interaction.options.getString("evento_id", true));
+  if (!eventId) {
+    await replyEphemeralCommand(
+      interaction,
+      "ID inválido",
+      "Informe um ID numérico de evento.",
+      EMBED.error,
+    );
+    return;
+  }
 
   const ev = await ctx.eventService.getEvent(interaction.guild.id, eventId);
   if (!ev) {
@@ -376,14 +391,21 @@ async function handleRelatorio(
   interaction: ChatInputCommandInteraction,
   ctx: BotContext,
 ): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
   if (!(await requireStaff(interaction))) return;
-  if (!interaction.guild) return;
+  if (!interaction.guild) {
+    await replyEphemeralCommand(
+      interaction,
+      "Servidor necessário",
+      "Use este comando em um **servidor**.",
+      EMBED.error,
+    );
+    return;
+  }
 
   const { year: cy, month: cm } = utcNowParts();
   const mes = interaction.options.getInteger("mes") ?? cm;
   const ano = interaction.options.getInteger("ano") ?? cy;
-
-  await interaction.deferReply({ ephemeral: true });
 
   const report = await ctx.reportService.getMonthlyReport(interaction.guild.id, ano, mes);
   const agg = report.aggregate;
@@ -485,15 +507,22 @@ async function handleRanking(
   interaction: ChatInputCommandInteraction,
   ctx: BotContext,
 ): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
   if (!(await requireStaff(interaction))) return;
-  if (!interaction.guild) return;
+  if (!interaction.guild) {
+    await replyEphemeralCommand(
+      interaction,
+      "Servidor necessário",
+      "Use este comando em um **servidor**.",
+      EMBED.error,
+    );
+    return;
+  }
 
   const { year: cy, month: cm } = utcNowParts();
   const mes = interaction.options.getInteger("mes") ?? cm;
   const ano = interaction.options.getInteger("ano") ?? cy;
   const limite = interaction.options.getInteger("limite") ?? 10;
-
-  await interaction.deferReply({ ephemeral: true });
 
   const rows = await ctx.reportService.getRanking(
     interaction.guild.id,
@@ -533,15 +562,22 @@ async function handleExportar(
   interaction: ChatInputCommandInteraction,
   ctx: BotContext,
 ): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
   if (!(await requireAdmin(interaction))) return;
-  if (!interaction.guild) return;
+  if (!interaction.guild) {
+    await replyEphemeralCommand(
+      interaction,
+      "Servidor necessário",
+      "Use este comando em um **servidor**.",
+      EMBED.error,
+    );
+    return;
+  }
 
   const { year: cy, month: cm } = utcNowParts();
   const mes = interaction.options.getInteger("mes") ?? cm;
   const ano = interaction.options.getInteger("ano") ?? cy;
   const formato = interaction.options.getString("formato", true) as "json" | "csv";
-
-  await interaction.deferReply({ ephemeral: true });
 
   const payload = await ctx.exportService.buildMonthExport(interaction.guild.id, ano, mes);
   const buf =
@@ -578,7 +614,15 @@ async function handleDeletarDados(
   _ctx: BotContext,
 ): Promise<void> {
   if (!(await requireAdmin(interaction))) return;
-  if (!interaction.guild) return;
+  if (!interaction.guild) {
+    await replyEphemeralCommand(
+      interaction,
+      "Servidor necessário",
+      "Use este comando em um **servidor**.",
+      EMBED.error,
+    );
+    return;
+  }
 
   await interaction.reply({
     embeds: [buildPurgeConfirmationEmbed()],
