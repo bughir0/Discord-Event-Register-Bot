@@ -41,7 +41,7 @@ export function buildEventAnnouncementEmbed(
       ? `${Math.floor(event.planned_duration_seconds / 60)} min (planejada)`
       : "Até encerramento manual";
   return new EmbedBuilder()
-    .setTitle(`Evento: ${event.name}`)
+    .setTitle(`Evento: ${event.name}`.slice(0, 256))
     .setDescription(event.description ?? "_Sem descrição_")
     .setColor(BRAND)
     .addFields(

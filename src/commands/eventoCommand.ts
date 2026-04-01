@@ -136,7 +136,7 @@ async function handleIniciar(
       embeds: [
         embedResponse(
           "Evento iniciado",
-          `**${nome}**\nID: \`${event.id}\`\nA mensagem pública foi enviada abaixo.`,
+          `**${event.name}**\nID: \`${event.id}\`\nA data/hora de início foi registada no **nome** do evento (lista, export e anúncio).`,
           EMBED.ok,
         ),
       ],
@@ -148,7 +148,7 @@ async function handleIniciar(
       action: "EVENT_START",
       targetType: "event",
       targetId: event.id,
-      payload: { name: nome, channelId: interaction.channel.id },
+      payload: { name: event.name, channelId: interaction.channel.id },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Erro ao criar evento.";

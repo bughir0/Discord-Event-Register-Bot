@@ -12,7 +12,13 @@ export function buildEventoSlashCommand() {
         .setName("iniciar")
         .setDescription("Inicia um evento neste canal (embed + botão de participação)")
         .addStringOption((o) =>
-          o.setName("nome").setDescription("Nome do evento").setRequired(true).setMaxLength(100),
+          o
+            .setName("nome")
+            .setDescription(
+              "Nome base do evento (a data e hora de início são acrescentadas automaticamente ao nome)",
+            )
+            .setRequired(true)
+            .setMaxLength(100),
         )
         .addStringOption((o) =>
           o.setName("descricao").setDescription("Descrição").setMaxLength(2000),

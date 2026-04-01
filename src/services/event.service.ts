@@ -7,6 +7,7 @@ import type {
   EventSnapshotRow,
   ParticipantRow,
 } from "../models/types.js";
+import { buildEventNameWithStartDate } from "../utils/eventDate.js";
 import { buildParticipationBuckets, totalMessages } from "./participation.service.js";
 
 export class EventService {
@@ -38,13 +39,15 @@ export class EventService {
       input.plannedDurationMinutes != null && input.plannedDurationMinutes > 0
         ? input.plannedDurationMinutes * 60
         : null;
+    const startedAt = new Date();
+    const name = buildEventNameWithStartDate(input.name, startedAt);
     return this.events().create({
       guildId: input.guildId,
-      name: input.name,
+      name,
       description: input.description,
       organizerId: input.organizerId,
       channelId: input.channelId,
-      startedAt: new Date(),
+      startedAt,
       plannedDurationSeconds: planned,
     });
   }
