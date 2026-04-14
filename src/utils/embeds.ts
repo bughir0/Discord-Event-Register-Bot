@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import { buildLeavePromptId, buildParticipatePromptId } from "./constants.js";
 import type { EventRow, EventFinishStats, ParticipantRow } from "../models/types.js";
+import { EMBED } from "./embedResponse.js";
 import { formatUserList } from "./text.js";
 
 const BRAND: ColorResolvable = 0x5865f2;
@@ -75,6 +76,47 @@ export function buildParticipateRow(eventId: string): ActionRowBuilder<ButtonBui
       .setLabel("Sair da dinâmica")
       .setStyle(ButtonStyle.Danger),
   );
+}
+
+/** Aviso antes de encerrar: quem já confirmou pelo botão e lembrete para quem só mandou mensagem. */
+export function buildEventClosingReminderEmbed(params: {
+  eventName: string;
+  moderatorMention: string;
+  registeredUserIds: string[];
+  messageOnlyUserIds: string[];
+}): EmbedBuilder {
+  const { eventName, moderatorMention, registeredUserIds, messageOnlyUserIds } = params;
+  const pending = messageOnlyUserIds.length;
+  return new EmbedBuilder()
+    .setTitle("Evento a finalizar")
+    .setColor(EMBED.warn)
+    .setDescription(
+      [
+        `**${eventName}** vai ser encerrado por ${moderatorMention}.`,
+        "",
+        "Se você **mandou mensagens no canal** do evento mas **ainda não clicou em Participar da dinâmica**, confirme **agora** (no anúncio original ou nos botões desta mensagem) para **registar a participação** e não ficar de fora do registo oficial.",
+        pending > 0
+          ? `\n_Há **${pending}** membro(s) com mensagens contabilizadas que ainda não confirmaram pelo botão — receberam menção no canal._`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    )
+    .addFields(
+      {
+        name: `Já registraram participação — botão (${registeredUserIds.length})`,
+        value: formatUserList(registeredUserIds, 25),
+        inline: false,
+      },
+      {
+        name: `Só mensagens, sem botão ainda (${messageOnlyUserIds.length})`,
+        value: formatUserList(messageOnlyUserIds, 25),
+        inline: false,
+      },
+    )
+    .setFooter({
+      text: "Após o encerramento, o botão deixará de funcionar. Quem confirmar a tempo entra no registo como nos eventos anteriores.",
+    });
 }
 
 export function buildThankYouEmbeds(stats: EventFinishStats, eventName: string): EmbedBuilder[] {

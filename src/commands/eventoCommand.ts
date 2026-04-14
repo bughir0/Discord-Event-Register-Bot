@@ -1,9 +1,11 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import {
   AttachmentBuilder,
   ChannelType,
   type ChatInputCommandInteraction,
   EmbedBuilder,
   type GuildTextBasedChannel,
+  type Message,
 } from "discord.js";
 import type { BotContext } from "../context.js";
 import { replyEphemeralCommand, requireAdmin, requireStaff } from "../utils/permissions.js";
@@ -14,10 +16,12 @@ import {
 } from "../interactions/purgeDataButtonHandler.js";
 import {
   buildEventAnnouncementEmbed,
+  buildEventClosingReminderEmbed,
   buildParticipateRow,
   buildThankYouEmbeds,
 } from "../utils/embeds.js";
 import type { EventRow } from "../models/types.js";
+import { buildParticipationBuckets } from "../services/participation.service.js";
 
 function utcNowParts(): { year: number; month: number } {
   const d = new Date();
@@ -30,19 +34,27 @@ function parseEventId(raw: string | null): string | null {
   return /^\d+$/.test(t) ? t : null;
 }
 
-async function disableOriginalButton(
+async function clearMessageComponents(
   interaction: ChatInputCommandInteraction,
-  event: EventRow,
+  channelId: string,
+  messageId: string | null,
 ): Promise<void> {
-  if (!event.embed_message_id) return;
+  if (!messageId) return;
   try {
-    const ch = await interaction.client.channels.fetch(event.channel_id);
+    const ch = await interaction.client.channels.fetch(channelId);
     if (!ch?.isTextBased() || ch.type === ChannelType.DM) return;
-    const msg = await ch.messages.fetch(event.embed_message_id);
+    const msg = await ch.messages.fetch(messageId);
     await msg.edit({ components: [] });
   } catch {
     // mensagem apagada ou sem permissão
   }
+}
+
+async function disableOriginalButton(
+  interaction: ChatInputCommandInteraction,
+  event: EventRow,
+): Promise<void> {
+  await clearMessageComponents(interaction, event.channel_id, event.embed_message_id);
 }
 
 export async function handleEventoCommand(
@@ -212,18 +224,80 @@ async function handleFinalizar(
     return;
   }
 
+  const channel = interaction.channel as GuildTextBasedChannel;
+  /** Discord processa no máx. ~50 menções diretas por mensagem; margem para o texto. */
+  const MENTION_BATCH = 45;
+  /** Tempo para quem só mandou mensagem conseguir clicar em Participar antes do encerramento na BD. */
+  const GRACE_MS = 20_000;
+
   try {
+    const participants = await ctx.eventService.listParticipants(eventId);
+    const buckets = buildParticipationBuckets(participants);
+    const registeredUserIds = [...buckets.buttonOnly, ...buckets.both].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    const messageOnlyUserIds = [...buckets.messageOnly].sort((a, b) => a.localeCompare(b));
+
+    const closingEmbed = buildEventClosingReminderEmbed({
+      eventName: before.name,
+      moderatorMention: `<@${interaction.user.id}>`,
+      registeredUserIds,
+      messageOnlyUserIds,
+    });
+    const row = buildParticipateRow(eventId);
+
+    let lastCallMessage: Message | null = null;
+
+    if (messageOnlyUserIds.length > 0) {
+      for (let i = 0; i < messageOnlyUserIds.length; i += MENTION_BATCH) {
+        const batch = messageOnlyUserIds.slice(i, i + MENTION_BATCH);
+        const content = batch.map((id) => `<@${id}>`).join(" ");
+        if (i === 0) {
+          lastCallMessage = await channel.send({
+            content,
+            embeds: [closingEmbed],
+            components: [row],
+            allowedMentions: { users: batch },
+          });
+        } else {
+          await channel.send({
+            content,
+            allowedMentions: { users: batch },
+          });
+        }
+      }
+      await sleep(GRACE_MS);
+    } else {
+      lastCallMessage = await channel.send({
+        embeds: [closingEmbed],
+        components: [row],
+      });
+    }
+
     const stats = await ctx.eventService.finalizeEvent(eventId, interaction.guild.id);
     await disableOriginalButton(interaction, before);
 
+    if (lastCallMessage) {
+      try {
+        await lastCallMessage.edit({ components: [] });
+      } catch {
+        // mensagem apagada ou sem permissão
+      }
+    }
+
     const embeds = buildThankYouEmbeds(stats, before.name);
-    await (interaction.channel as GuildTextBasedChannel).send({ embeds });
+    await channel.send({ embeds });
+
+    const graceNote =
+      messageOnlyUserIds.length > 0
+        ? ` Foi dada uma janela de **${GRACE_MS / 1000}s** após o aviso para quem só tinha mensagens confirmar pelo botão.`
+        : "";
 
     await interaction.editReply({
       embeds: [
         embedResponse(
           "Evento finalizado",
-          `**${before.name}** foi finalizado. O resumo foi enviado na mensagem acima.`,
+          `**${before.name}** foi finalizado.${graceNote} O resumo foi enviado no canal.`,
           EMBED.ok,
         ),
       ],
