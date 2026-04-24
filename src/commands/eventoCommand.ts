@@ -223,6 +223,18 @@ async function handleFinalizar(
     });
     return;
   }
+  if (before.channel_id !== interaction.channel.id) {
+    await interaction.editReply({
+      embeds: [
+        embedResponse(
+          "Canal incorreto",
+          "Este evento foi criado noutro canal. Use **/evento finalizar** no canal original do evento para manter o registo de mensagens consistente.",
+          EMBED.warn,
+        ),
+      ],
+    });
+    return;
+  }
 
   const channel = interaction.channel as GuildTextBasedChannel;
   /** Discord processa no máx. ~50 menções diretas por mensagem; margem para o texto. */

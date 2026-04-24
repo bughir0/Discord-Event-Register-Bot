@@ -68,6 +68,18 @@ export class EventRepository {
     return res.rows[0] ? mapEvent(res.rows[0]) : null;
   }
 
+  /** Evento ativo por servidor + canal (contagem de mensagens só no canal do evento). */
+  async findActiveByGuildAndChannel(guildId: string, channelId: string): Promise<EventRow | null> {
+    const res = await this.db.query(
+      `SELECT * FROM events
+       WHERE guild_id = $1 AND channel_id = $2 AND status = 'active'
+       ORDER BY id DESC
+       LIMIT 1`,
+      [guildId, channelId],
+    );
+    return res.rows[0] ? mapEvent(res.rows[0]) : null;
+  }
+
   /** Todos os eventos ativos do servidor (para autocomplete em /evento finalizar). */
   async listActiveByGuild(guildId: string): Promise<EventRow[]> {
     const res = await this.db.query(

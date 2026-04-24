@@ -217,8 +217,8 @@ export class EventService {
     eventId?: string;
     wasNewParticipant?: boolean;
   }> {
-    const active = await this.events().findActiveByChannel(channelId);
-    if (!active || active.guild_id !== guildId) return { recorded: false };
+    const active = await this.events().findActiveByGuildAndChannel(guildId, channelId);
+    if (!active) return { recorded: false };
     if (active.organizer_id === userId) return { recorded: false };
     const r = await this.participants().recordMessage(active.id, userId, new Date());
     return {
